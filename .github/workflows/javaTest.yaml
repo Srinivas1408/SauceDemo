@@ -1,0 +1,38 @@
+name: Run Java Test
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: mvn test
+
+      - name: Send HTML Report Mail
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+
+
+          username: ${{secrets.SAUCEDEMO_USERNAME}}
+          password: ${{secrets.SAUCEDEMO_PASSWORD}}
+
+
+          subject: SauceDemoSite Test Report
+          to: srinivassri1408@gmail.com
+          from: GitHub Actions
+          html_body: file://target/surefire-reports/emailable-report.html
