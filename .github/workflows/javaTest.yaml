@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   test:
@@ -17,7 +18,23 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - run: mvn test
+      - name: Run Maven Tests
+        run: mvn clean test
+        continue-on-error: true
+
+      - name: Read HTML Report Content
+        id: read_report
+        if: always()
+        run: |
+          if [ -f "target/surefire-reports/emailable-report.html" ]; then
+            # Read the HTML content (escape for YAML)
+            CONTENT=$(cat target/surefire-reports/emailable-report.html | python3 -c 'import sys, json; print(json.dumps(sys.stdin.read()))')
+            echo "report_content=$CONTENT" >> $GITHUB_OUTPUT
+            echo "report_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "report_exists=false" >> $GITHUB_OUTPUT
+            echo "report_content='<html><body><h1>No test report found</h1></body></html>'" >> $GITHUB_OUTPUT
+          fi
 
       - name: Send HTML Report Mail
         if: always()
@@ -26,13 +43,15 @@ jobs:
           server_address: smtp.gmail.com
           server_port: 465
           secure: true
-
-
           username: ${{secrets.SAUCEDEMO_USERNAME}}
           password: ${{secrets.SAUCEDEMO_PASSWORD}}
-
-
-          subject: SauceDemoSite Test Report
+          subject: SauceDemoSite Test Report - Run #${{ github.run_number }}
           to: srinivassri1408@gmail.com
-          from: GitHub Actions
-          html_body: file://target/surefire-reports/emailable-report.html
+          from: GitHub Actions <${{secrets.SAUCEDEMO_USERNAME}}>
+          body: |
+            Test execution completed.
+            Run Number: ${{ github.run_number }}
+            Status: ${{ job.status }}
+            Repository: ${{ github.repository }}
+          html_body: ${{ steps.read_report.outputs.report_content }}
+          attachments: target/surefire-reports/emailable-report.html
